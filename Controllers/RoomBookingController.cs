@@ -37,8 +37,12 @@ namespace backend.Controllers
 
         // POST: api/room-bookings
         [HttpPost]
-        public async Task<IActionResult> Create(RoomBooking booking)
+        [HttpPost]
+        public async Task<IActionResult> Create([FromBody] RoomBooking booking)
         {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
             _context.RoomBookings.Add(booking);
             await _context.SaveChangesAsync();
 
