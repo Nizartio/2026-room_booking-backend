@@ -70,9 +70,10 @@ namespace backend.Controllers
             if (booking == null)
                 return NotFound();
 
-            _context.RoomBookings.Remove(booking);
-            await _context.SaveChangesAsync();
+            booking.IsDeleted = true;
+            booking.DeletedAt = DateTime.UtcNow;
 
+            await _context.SaveChangesAsync();
             return NoContent();
         }
     }

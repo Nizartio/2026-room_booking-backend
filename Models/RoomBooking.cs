@@ -6,23 +6,24 @@ namespace backend.Models
     {
         public int Id { get; set; }
 
-        [Required(ErrorMessage = "Room name is required")]
-        [StringLength(100)]
+        [Required, StringLength(100)]
         public string RoomName { get; set; } = string.Empty;
 
-        [Required(ErrorMessage = "Borrower name is required")]
-        [StringLength(100)]
+        [Required, StringLength(100)]
         public string BorrowerName { get; set; } = string.Empty;
 
-        [Required(ErrorMessage = "Start time is required")]
+        [Required]
         public DateTime StartTime { get; set; }
 
-        [Required(ErrorMessage = "End time is required")]
+        [Required]
         public DateTime EndTime { get; set; }
 
         [Required]
-        [RegularExpression("Pending|Approved|Rejected",
-            ErrorMessage = "Status must be Pending, Approved, or Rejected")]
+        [RegularExpression("Pending|Approved|Rejected")]
         public string Status { get; set; } = "Pending";
+
+        // 🔽 Soft delete
+        public bool IsDeleted { get; set; } = false;
+        public DateTime? DeletedAt { get; set; }
     }
 }
