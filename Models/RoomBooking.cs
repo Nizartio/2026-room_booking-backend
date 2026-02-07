@@ -6,8 +6,11 @@ namespace backend.Models
     {
         public int Id { get; set; }
 
-        [Required, StringLength(100)]
-        public string RoomName { get; set; } = string.Empty;
+        [Required]
+        public int RoomId { get; set; }
+
+        // Navigation property
+        public Room Room { get; set; } = null!;
 
         [Required, StringLength(100)]
         public string BorrowerName { get; set; } = string.Empty;
