@@ -6,14 +6,10 @@ namespace backend.Data
     public class ApplicationDbContext : DbContext
     {
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
-            : base(options) { }
-
-        public DbSet<RoomBooking> RoomBookings => Set<RoomBooking>();
-
-        protected override void OnModelCreating(ModelBuilder modelBuilder)
+            : base(options)
         {
-            modelBuilder.Entity<RoomBooking>()
-                .HasQueryFilter(rb => !rb.IsDeleted);
         }
+        public DbSet<Room> Rooms => Set<Room>();
+        public DbSet<RoomBooking> RoomBookings => Set<RoomBooking>();
     }
 }
