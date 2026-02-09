@@ -16,6 +16,10 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+    RoomSeeder.Seed(context);          // 1️⃣ master rooms
+    CustomerSeeder.Seed(context);      // 2️⃣ master customers
+    RoomBookingSeeder.Seed(context);
 }
 
 app.MapControllers();
