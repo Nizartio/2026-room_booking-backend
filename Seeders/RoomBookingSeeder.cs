@@ -19,7 +19,7 @@ namespace backend.Seeders
                 .First(r => r.Name == "Ruang Rapat A" && r.IsActive);
 
             var customer1 = context.Customers
-                .First(c => c.Email == "nizartio@example.com" && c.IsActive);
+                .First(c => c.Email == "nizartiochandraadinata@gmail.com" && c.IsActive);
 
             var customer2 = context.Customers
                 .First(c => c.Email == "bem@pens.ac.id" && c.IsActive);
