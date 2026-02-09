@@ -10,19 +10,22 @@ namespace backend.Models
         [StringLength(100)]
         public string Name { get; set; } = string.Empty;
 
-        [Required]
         [Range(1, 500)]
         public int Capacity { get; set; }
 
-        [Required]
-        [StringLength(100)]
-        public string Location { get; set; } = string.Empty;
+        public string? Description { get; set; }
 
+        // Status bisnis
         public bool IsActive { get; set; } = true;
 
+        // Metadata
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-        // Navigation property
+        // Soft delete
+        public bool IsDeleted { get; set; } = false;
+        public DateTime? DeletedAt { get; set; }
+
+        // Navigation
         public List<RoomBooking> RoomBookings { get; set; } = new();
     }
 }

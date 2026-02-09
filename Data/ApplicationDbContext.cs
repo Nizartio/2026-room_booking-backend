@@ -21,7 +21,8 @@ namespace backend.Data
             // Soft delete filter
             modelBuilder.Entity<Customer>()
                 .HasQueryFilter(c => !c.IsDeleted);
-
+            modelBuilder.Entity<Room>() 
+                .HasQueryFilter(r => !r.IsDeleted);
             modelBuilder.Entity<RoomBooking>()
                 .HasQueryFilter(rb => !rb.IsDeleted);
 

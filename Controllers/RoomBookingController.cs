@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using backend.Data;
 using backend.Models;
+using backend.DTOs.Requests;
 using backend.DTOs.Responses;
 
 namespace backend.Controllers
@@ -78,16 +79,36 @@ namespace backend.Controllers
         }
 
 
-        // GET: api/room-bookings/{id}
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
-            var booking = await _context.RoomBookings.FindAsync(id);
+            var booking = await _context.RoomBookings
+                .Where(rb => rb.Id == id)
+                .Select(rb => new RoomBookingDetailResponseDto
+                {
+                    Id = rb.Id,
+
+                    RoomId = rb.RoomId,
+                    RoomName = rb.Room.Name,
+                    RoomCapacity = rb.Room.Capacity,
+
+                    CustomerId = rb.CustomerId,
+                    CustomerName = rb.Customer.Name,
+                    CustomerEmail = rb.Customer.Email,
+                    CustomerPhone = rb.Customer.Phone,
+
+                    StartTime = rb.StartTime,
+                    EndTime = rb.EndTime,
+                    Status = rb.Status,
+                })
+                .FirstOrDefaultAsync();
+
             if (booking == null)
                 return NotFound();
 
             return Ok(booking);
         }
+
 
         // POST: api/room-bookings
        [HttpPost]
@@ -144,33 +165,27 @@ namespace backend.Controllers
 
             return NoContent();
         }
+        /// <summary>
+        /// Update booking status (Admin only)
+        /// </summary>
+        // PUT: api/room-bookings/{id}
+        [HttpPut("{id}/status")]
+        public async Task<IActionResult> UpdateStatus(
+            int id,
+            UpdateRoomBookingStatusDto request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
 
-        [HttpPut("{id}/approve")]
-      public async Task<IActionResult> Approve(int id)
-      {
-          var booking = await _context.RoomBookings.FindAsync(id);
-          if (booking == null)
-              return NotFound();
+            var booking = await _context.RoomBookings.FindAsync(id);
+            if (booking == null)
+                return NotFound();
 
-          booking.Status = "Approved";
-          await _context.SaveChangesAsync();
+            booking.Status = request.Status;
+            await _context.SaveChangesAsync();
 
-          return NoContent();
-      }
-
-      [HttpPut("{id}/reject")]
-      public async Task<IActionResult> Reject(int id)
-      {
-          var booking = await _context.RoomBookings.FindAsync(id);
-          if (booking == null)
-              return NotFound();
-
-          booking.Status = "Rejected";
-          await _context.SaveChangesAsync();
-
-          return NoContent();
-      }
-
+            return NoContent();
+        }
 
         // DELETE: api/room-bookings/{id}
         [HttpDelete("{id}")]
