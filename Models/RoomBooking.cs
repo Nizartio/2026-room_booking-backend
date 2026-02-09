@@ -28,6 +28,8 @@ namespace backend.Models
         [Required]
         [RegularExpression("Pending|Approved|Rejected")]
         public string Status { get; set; } = "Pending";
+        
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         // 🔽 Soft delete
         public bool IsDeleted { get; set; } = false;
