@@ -12,8 +12,12 @@ namespace backend.Models
         // Navigation property
         public Room Room { get; set; } = null!;
 
-        [Required, StringLength(100)]
-        public string BorrowerName { get; set; } = string.Empty;
+        [Required]
+        public int CustomerId { get; set; }
+
+        // Navigation
+        public Customer Customer { get; set; } = null!;
+
 
         [Required]
         public DateTime StartTime { get; set; }
