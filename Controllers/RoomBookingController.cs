@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using backend.Data;
 using backend.Models;
+using backend.DTOs;
 
 namespace backend.Controllers
 {
@@ -18,11 +19,64 @@ namespace backend.Controllers
 
         // GET: api/room-bookings
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10,
+            [FromQuery] string? status = null,
+            [FromQuery] int? roomId = null,
+            [FromQuery] int? customerId = null
+        )
         {
-            var bookings = await _context.RoomBookings.ToListAsync();
-            return Ok(bookings);
+            if (page < 1) page = 1;
+            if (pageSize < 1 || pageSize > 100) pageSize = 10;
+
+            var query = _context.RoomBookings
+                .Include(rb => rb.Room)
+                .Include(rb => rb.Customer)
+                .AsQueryable();
+
+            // 🔍 Filtering
+            if (!string.IsNullOrWhiteSpace(status))
+                query = query.Where(rb => rb.Status == status);
+
+            if (roomId.HasValue)
+                query = query.Where(rb => rb.RoomId == roomId);
+
+            if (customerId.HasValue)
+                query = query.Where(rb => rb.CustomerId == customerId);
+
+            var totalItems = await query.CountAsync();
+
+            var bookings = await query
+              .OrderByDescending(rb => rb.StartTime)
+              .Skip((page - 1) * pageSize)
+              .Take(pageSize)
+              .Select(rb => new RoomBookingResponseDto
+              {
+                  Id = rb.Id,
+                  RoomId = rb.RoomId,
+                  RoomName = rb.Room.Name,
+
+                  CustomerId = rb.CustomerId,
+                  CustomerName = rb.Customer.Name,
+                  CustomerEmail = rb.Customer.Email,
+
+                  StartTime = rb.StartTime,
+                  EndTime = rb.EndTime,
+                  Status = rb.Status
+              })
+              .ToListAsync();
+
+              return Ok(new
+              {
+                  page,
+                  pageSize,
+                  totalItems,
+                  totalPages = (int)Math.Ceiling(totalItems / (double)pageSize),
+                  data = bookings
+              });
         }
+
 
         // GET: api/room-bookings/{id}
         [HttpGet("{id}")]
@@ -92,30 +146,30 @@ namespace backend.Controllers
         }
 
         [HttpPut("{id}/approve")]
-        public async Task<IActionResult> Approve(int id)
-        {
-            var booking = await _context.RoomBookings.FindAsync(id);
-            if (booking == null)
-                return NotFound();
+      public async Task<IActionResult> Approve(int id)
+      {
+          var booking = await _context.RoomBookings.FindAsync(id);
+          if (booking == null)
+              return NotFound();
 
-            booking.Status = "Approved";
-            await _context.SaveChangesAsync();
+          booking.Status = "Approved";
+          await _context.SaveChangesAsync();
 
-            return NoContent();
-        }
+          return NoContent();
+      }
 
-        [HttpPut("{id}/reject")]
-        public async Task<IActionResult> Reject(int id)
-        {
-            var booking = await _context.RoomBookings.FindAsync(id);
-            if (booking == null)
-                return NotFound();
+      [HttpPut("{id}/reject")]
+      public async Task<IActionResult> Reject(int id)
+      {
+          var booking = await _context.RoomBookings.FindAsync(id);
+          if (booking == null)
+              return NotFound();
 
-            booking.Status = "Rejected";
-            await _context.SaveChangesAsync();
+          booking.Status = "Rejected";
+          await _context.SaveChangesAsync();
 
-            return NoContent();
-        }
+          return NoContent();
+      }
 
 
         // DELETE: api/room-bookings/{id}
