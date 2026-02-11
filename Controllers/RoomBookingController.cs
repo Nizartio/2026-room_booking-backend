@@ -112,46 +112,140 @@ namespace backend.Controllers
 
         // POST: api/room-bookings
        [HttpPost]
-        public async Task<IActionResult> Create(RoomBooking booking)
+        public async Task<IActionResult> Create(CreateRoomBookingRequestDto request)
         {
-            // 1️⃣ Model validation
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            // 2️⃣ Customer harus ada & aktif
-            var customer = await _context.Customers.FindAsync(booking.CustomerId);
+            // Validasi customer & room (sudah kita buat)
+            var customer = await _context.Customers.FindAsync(request.CustomerId);
             if (customer == null || !customer.IsActive)
                 return BadRequest("Customer not found or inactive.");
 
-            // 3️⃣ Room harus ada & aktif
-            var room = await _context.Rooms.FindAsync(booking.RoomId);
+            var room = await _context.Rooms.FindAsync(request.RoomId);
             if (room == null || !room.IsActive)
                 return BadRequest("Room not found or inactive.");
 
-            // 4️⃣ Validasi waktu
-            if (booking.EndTime <= booking.StartTime)
+            if (request.EndTime <= request.StartTime)
                 return BadRequest("End time must be after start time.");
 
-            // 5️⃣ Cek bentrok jadwal (ignore yang Rejected)
             bool isOverlapping = await _context.RoomBookings.AnyAsync(rb =>
-                rb.RoomId == booking.RoomId &&
+                rb.RoomId == request.RoomId &&
                 rb.Status != "Rejected" &&
-                booking.StartTime < rb.EndTime &&
-                booking.EndTime > rb.StartTime
+                request.StartTime < rb.EndTime &&
+                request.EndTime > rb.StartTime
             );
 
             if (isOverlapping)
                 return BadRequest("Room is already booked at the selected time.");
 
-            // 6️⃣ Force status (user submit → Pending)
-            booking.Status = "Pending";
+            var booking = new RoomBooking
+            {
+                RoomId = request.RoomId,
+                CustomerId = request.CustomerId,
+                StartTime = request.StartTime,
+                EndTime = request.EndTime,
+                Status = "Pending"
+            };
 
             _context.RoomBookings.Add(booking);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetById), new { id = booking.Id }, booking);
+            var response = new RoomBookingResponseDto
+            {
+                Id = booking.Id,
+                RoomId = room.Id,
+                RoomName = room.Name,
+                CustomerId = customer.Id,
+                CustomerName = customer.Name,
+                CustomerEmail = customer.Email,
+                StartTime = booking.StartTime,
+                EndTime = booking.EndTime,
+                Status = booking.Status
+            };
+
+            return CreatedAtAction(nameof(GetById), new { id = booking.Id }, response);
         }
 
+        [HttpPost("bulk")]
+        public async Task<IActionResult> CreateBulk(
+            [FromBody] CreateBulkRoomBookingRequestDto request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var response = new BulkRoomBookingResponseDto
+            {
+                TotalRequested = request.Bookings.Count
+            };
+
+            foreach (var booking in request.Bookings)
+            {
+                var result = new BulkBookingResultDto
+                {
+                    RoomId = booking.RoomId,
+                    StartTime = booking.StartTime,
+                    EndTime = booking.EndTime
+                };
+
+                // VALIDASI ROOM ADA
+                var room = await _context.Rooms
+                    .FirstOrDefaultAsync(r => r.Id == booking.RoomId);
+
+                if (room == null)
+                {
+                    result.Success = false;
+                    result.ErrorMessage = "Room not found.";
+                    response.Results.Add(result);
+                    continue;
+                }
+
+                if (!room.IsActive)
+                {
+                    result.Success = false;
+                    result.ErrorMessage = "Room is not active.";
+                    response.Results.Add(result);
+                    continue;
+                }
+
+                // VALIDASI BENTROK
+                bool isConflict = await _context.RoomBookings
+                    .AnyAsync(rb =>
+                        rb.RoomId == booking.RoomId &&
+                        rb.StartTime < booking.EndTime &&
+                        booking.StartTime < rb.EndTime
+                    );
+
+                if (isConflict)
+                {
+                    result.Success = false;
+                    result.ErrorMessage = "Room already booked at this time.";
+                    response.Results.Add(result);
+                    continue;
+                }
+
+                // SIMPAN BOOKING
+                var newBooking = new RoomBooking
+                {
+                    RoomId = booking.RoomId,
+                    CustomerId = booking.CustomerId,
+                    StartTime = booking.StartTime,
+                    EndTime = booking.EndTime,
+                    Status = "Pending"
+                };
+
+                _context.RoomBookings.Add(newBooking);
+                await _context.SaveChangesAsync();
+
+                result.Success = true;
+                response.Results.Add(result);
+            }
+
+            response.SuccessCount = response.Results.Count(r => r.Success);
+            response.FailedCount = response.Results.Count(r => !r.Success);
+
+            return Ok(response);
+        }
 
         // PUT: api/room-bookings/{id}
         [HttpPut("{id}")]
