@@ -37,8 +37,12 @@ namespace backend.Controllers
                 .AsQueryable();
 
             // 🔍 Filtering
-            if (!string.IsNullOrWhiteSpace(status))
-                query = query.Where(rb => rb.Status == status);
+            if (!string.IsNullOrWhiteSpace(status) &&
+                Enum.TryParse<BookingStatus>(status, true, out var parsedStatus))
+            {
+                query = query.Where(rb => rb.Status == parsedStatus);
+            }
+
 
             if (roomId.HasValue)
                 query = query.Where(rb => rb.RoomId == roomId);
@@ -64,7 +68,7 @@ namespace backend.Controllers
 
                   StartTime = rb.StartTime,
                   EndTime = rb.EndTime,
-                  Status = rb.Status
+                  Status = rb.Status.ToString()
               })
               .ToListAsync();
 
@@ -78,7 +82,61 @@ namespace backend.Controllers
               });
         }
 
+        // GET: api/room-bookings/admin/pending
+        [HttpGet("admin")]
+        public async Task<IActionResult> GetForAdmin(
+            [FromQuery] string? status = null,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10)
+        {
+            if (page < 1) page = 1;
+            if (pageSize < 1 || pageSize > 100) pageSize = 10;
 
+            var query = _context.RoomBookings
+                .Include(rb => rb.Room)
+                .Include(rb => rb.Customer)
+                .Where(rb => !rb.IsDeleted)
+                .AsQueryable();
+
+            // Filter by status (optional)
+            if (!string.IsNullOrWhiteSpace(status) &&
+                Enum.TryParse<BookingStatus>(status, true, out var parsedStatus))
+            {
+                query = query.Where(rb => rb.Status == parsedStatus);
+            }
+
+            var totalItems = await query.CountAsync();
+
+            var bookings = await query
+                .OrderBy(rb => rb.StartTime)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(rb => new RoomBookingResponseDto
+                {
+                    Id = rb.Id,
+                    RoomId = rb.RoomId,
+                    RoomName = rb.Room.Name,
+
+                    CustomerId = rb.CustomerId,
+                    CustomerName = rb.Customer.Name,
+                    CustomerEmail = rb.Customer.Email,
+
+                    StartTime = rb.StartTime,
+                    EndTime = rb.EndTime,
+                    Status = rb.Status.ToString()
+                })
+                .ToListAsync();
+
+            return Ok(new
+            {
+                page,
+                pageSize,
+                totalItems,
+                totalPages = (int)Math.Ceiling(totalItems / (double)pageSize),
+                data = bookings
+            });
+        }
+  
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
@@ -99,7 +157,7 @@ namespace backend.Controllers
 
                     StartTime = rb.StartTime,
                     EndTime = rb.EndTime,
-                    Status = rb.Status,
+                    Status = rb.Status.ToString(),
                 })
                 .FirstOrDefaultAsync();
 
@@ -131,7 +189,7 @@ namespace backend.Controllers
 
             bool isOverlapping = await _context.RoomBookings.AnyAsync(rb =>
                 rb.RoomId == request.RoomId &&
-                rb.Status != "Rejected" &&
+                rb.Status != BookingStatus.Rejected &&
                 request.StartTime < rb.EndTime &&
                 request.EndTime > rb.StartTime
             );
@@ -145,7 +203,7 @@ namespace backend.Controllers
                 CustomerId = request.CustomerId,
                 StartTime = request.StartTime,
                 EndTime = request.EndTime,
-                Status = "Pending"
+                Status = BookingStatus.Pending
             };
 
             _context.RoomBookings.Add(booking);
@@ -161,7 +219,7 @@ namespace backend.Controllers
                 CustomerEmail = customer.Email,
                 StartTime = booking.StartTime,
                 EndTime = booking.EndTime,
-                Status = booking.Status
+                Status = booking.Status.ToString()
             };
 
             return CreatedAtAction(nameof(GetById), new { id = booking.Id }, response);
@@ -231,7 +289,7 @@ namespace backend.Controllers
                     CustomerId = booking.CustomerId,
                     StartTime = booking.StartTime,
                     EndTime = booking.EndTime,
-                    Status = "Pending"
+                    Status = BookingStatus.Pending
                 };
 
                 _context.RoomBookings.Add(newBooking);
@@ -246,6 +304,35 @@ namespace backend.Controllers
 
             return Ok(response);
         }
+        [HttpPost("check-conflicts")]
+        public async Task<ActionResult<IEnumerable<object>>> CheckConflicts(
+            [FromBody] List<CreateRoomBookingRequestDto> requests)
+        {
+            var conflicts = new List<object>();
+
+            foreach (var req in requests)
+            {
+                var hasConflict = await _context.RoomBookings
+                    .AnyAsync(rb =>
+                        !rb.IsDeleted &&
+                        rb.RoomId == req.RoomId &&
+                        (req.StartTime < rb.EndTime) &&
+                        (req.EndTime > rb.StartTime)
+                    );
+
+                if (hasConflict)
+                {
+                    conflicts.Add(new
+                    {
+                        req.RoomId,
+                        req.StartTime,
+                        req.EndTime
+                    });
+                }
+            }
+
+            return Ok(conflicts);
+        }
 
         // PUT: api/room-bookings/{id}
         [HttpPut("{id}")]
@@ -259,10 +346,8 @@ namespace backend.Controllers
 
             return NoContent();
         }
-        /// <summary>
-        /// Update booking status (Admin only)
-        /// </summary>
-        // PUT: api/room-bookings/{id}
+        
+        // PUT: api/room-bookings/{id}/status
         [HttpPut("{id}/status")]
         public async Task<IActionResult> UpdateStatus(
             int id,
@@ -271,14 +356,29 @@ namespace backend.Controllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            var booking = await _context.RoomBookings.FindAsync(id);
+            var booking = await _context.RoomBookings
+                .FirstOrDefaultAsync(rb => rb.Id == id && !rb.IsDeleted);
+
             if (booking == null)
                 return NotFound();
 
+            // Only allow update if currently Pending
+            if (booking.Status != BookingStatus.Pending)
+                return BadRequest("Only pending bookings can be updated.");
+
+            // Prevent invalid transitions
+            if (request.Status != BookingStatus.Approved &&
+                request.Status != BookingStatus.Rejected)
+                return BadRequest("Invalid status transition.");
+
             booking.Status = request.Status;
+
             await _context.SaveChangesAsync();
 
-            return NoContent();
+            return Ok(new
+            {
+                message = $"Booking {request.Status}"
+            });
         }
 
         // DELETE: api/room-bookings/{id}

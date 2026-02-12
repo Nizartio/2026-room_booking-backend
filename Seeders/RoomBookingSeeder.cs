@@ -32,7 +32,7 @@ namespace backend.Seeders
                     CustomerId = customer1.Id,
                     StartTime = DateTime.Today.AddHours(8),
                     EndTime = DateTime.Today.AddHours(10),
-                    Status = "Pending"
+                    Status = BookingStatus.Pending
                 },
                 new RoomBooking
                 {
@@ -40,7 +40,7 @@ namespace backend.Seeders
                     CustomerId = customer2.Id,
                     StartTime = DateTime.Today.AddHours(13),
                     EndTime = DateTime.Today.AddHours(15),
-                    Status = "Approved"
+                    Status = BookingStatus.Approved
                 }
             };
 

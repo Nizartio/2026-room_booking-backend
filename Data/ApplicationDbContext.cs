@@ -30,6 +30,11 @@ namespace backend.Data
             modelBuilder.Entity<Customer>()
                 .HasIndex(c => c.Email)
                 .IsUnique();
+            //For Enums
+            modelBuilder.Entity<RoomBooking>()
+                .Property(rb => rb.Status)
+                .HasConversion<string>();
+
         }
     }
 }
