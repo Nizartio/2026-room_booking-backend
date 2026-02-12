@@ -1,12 +1,10 @@
 using System.ComponentModel.DataAnnotations;
-
+using backend.Models;
 namespace backend.DTOs.Requests
 {
     public class UpdateRoomBookingStatusDto
     {
         [Required]
-        [RegularExpression("Pending|Approved|Rejected",
-            ErrorMessage = "Status must be Pending, Approved, or Rejected.")]
-        public string Status { get; set; } = string.Empty;
+        public BookingStatus Status { get; set; }
     }
 }

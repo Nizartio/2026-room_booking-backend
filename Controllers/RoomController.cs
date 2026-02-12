@@ -60,7 +60,20 @@ namespace backend.Controllers
 
             return Ok(room);
         }
+        
+        // GET: /api/rooms/unavailable-dates
+        [HttpGet("unavailable-dates")]
+        public async Task<ActionResult<IEnumerable<string>>> GetUnavailableDates()
+        {
+            var fullyBookedDates = await _context.RoomBookings
+                .Where(rb => !rb.IsDeleted)
+                .GroupBy(rb => rb.StartTime.Date)
+                .Where(g => g.Count() >= _context.Rooms.Count(r => !r.IsDeleted))
+                .Select(g => g.Key.ToString("yyyy-MM-dd"))
+                .ToListAsync();
 
+            return Ok(fullyBookedDates);
+        }
         // POST: /api/rooms
         [HttpPost]
         public async Task<IActionResult> Create(CreateRoomRequestDto request)

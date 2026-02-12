@@ -18,7 +18,6 @@ namespace backend.Models
         // Navigation
         public Customer Customer { get; set; } = null!;
 
-
         [Required]
         public DateTime StartTime { get; set; }
 
@@ -26,8 +25,7 @@ namespace backend.Models
         public DateTime EndTime { get; set; }
 
         [Required]
-        [RegularExpression("Pending|Approved|Rejected")]
-        public string Status { get; set; } = "Pending";
+        public BookingStatus Status { get; set; } = BookingStatus.Pending;
         
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
