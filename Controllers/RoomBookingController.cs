@@ -482,15 +482,25 @@ namespace backend.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var booking = await _context.RoomBookings.FindAsync(id);
-            if (booking == null)
+            var booking = await _context.RoomBookings
+                .FirstOrDefaultAsync(rb => rb.Id == id);
+
+            if (booking == null || booking.IsDeleted)
                 return NotFound();
+
+            // Protect approved booking
+            if (booking.Status == BookingStatus.Approved)
+                return BadRequest("Approved booking cannot be deleted.");
 
             booking.IsDeleted = true;
             booking.DeletedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
-            return NoContent();
-        } 
+
+            return Ok(new
+            {
+                message = "Booking deleted successfully."
+            });
+        }
     }
 }
