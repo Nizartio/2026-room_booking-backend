@@ -336,16 +336,50 @@ namespace backend.Controllers
 
         // PUT: api/room-bookings/{id}
         [HttpPut("{id}")]
-        public async Task<IActionResult> Update(int id, RoomBooking booking)
+        public async Task<IActionResult> Update(
+            int id,
+            UpdateRoomBookingTimeDto request)
         {
-            if (id != booking.Id)
-                return BadRequest();
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
 
-            _context.Entry(booking).State = EntityState.Modified;
+            var booking = await _context.RoomBookings
+                .FirstOrDefaultAsync(rb => rb.Id == id && !rb.IsDeleted);
+
+            if (booking == null)
+                return NotFound();
+
+            if (booking.Status != BookingStatus.Rejected)
+                return BadRequest("Only rejected bookings can be edited.");
+
+            if (request.EndTime <= request.StartTime)
+                return BadRequest("End time must be after start time.");
+
+            bool isConflict = await _context.RoomBookings
+                .AnyAsync(rb =>
+                    rb.Id != id &&
+                    rb.RoomId == booking.RoomId &&
+                    !rb.IsDeleted &&
+                    rb.Status != BookingStatus.Rejected &&
+                    request.StartTime < rb.EndTime &&
+                    request.EndTime > rb.StartTime
+                );
+
+            if (isConflict)
+                return BadRequest("Room already booked at this time.");
+
+            booking.StartTime = request.StartTime;
+            booking.EndTime = request.EndTime;
+
+            // Reset status
+            booking.Status = BookingStatus.Pending;
+
             await _context.SaveChangesAsync();
 
-            return NoContent();
+            return Ok(new { message = "Booking resubmitted for approval." });
         }
+
+
         
         // PUT: api/room-bookings/{id}/status
         [HttpPut("{id}/status")]
@@ -362,14 +396,29 @@ namespace backend.Controllers
             if (booking == null)
                 return NotFound();
 
-            // Only allow update if currently Pending
             if (booking.Status != BookingStatus.Pending)
                 return BadRequest("Only pending bookings can be updated.");
 
-            // Prevent invalid transitions
             if (request.Status != BookingStatus.Approved &&
                 request.Status != BookingStatus.Rejected)
                 return BadRequest("Invalid status transition.");
+
+            // 🔥 If approving, re-check conflict
+            if (request.Status == BookingStatus.Approved)
+            {
+                bool isConflict = await _context.RoomBookings
+                    .AnyAsync(rb =>
+                        rb.Id != id &&
+                        rb.RoomId == booking.RoomId &&
+                        rb.Status == BookingStatus.Approved &&
+                        !rb.IsDeleted &&
+                        booking.StartTime < rb.EndTime &&
+                        booking.EndTime > rb.StartTime
+                    );
+
+                if (isConflict)
+                    return BadRequest("Cannot approve. Time slot already taken.");
+            }
 
             booking.Status = request.Status;
 
@@ -379,6 +428,54 @@ namespace backend.Controllers
             {
                 message = $"Booking {request.Status}"
             });
+        }
+
+
+        // PUT: api/room-bookings/{id}/resubmit
+        /// <summary>
+        /// Customer: Edit and resubmit rejected booking
+        /// </summary>
+        [HttpPut("{id}/resubmit")]
+        public async Task<IActionResult> Resubmit(
+            int id,
+            UpdateRoomBookingTimeDto request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var booking = await _context.RoomBookings
+                .Include(rb => rb.Room)
+                .FirstOrDefaultAsync(rb => rb.Id == id && !rb.IsDeleted);
+
+            if (booking == null)
+                return NotFound();
+
+            if (booking.Status != BookingStatus.Rejected)
+                return BadRequest("Only rejected bookings can be resubmitted.");
+
+            if (request.EndTime <= request.StartTime)
+                return BadRequest("End time must be after start time.");
+
+            // check conflict
+            bool isConflict = await _context.RoomBookings
+                .AnyAsync(rb =>
+                    rb.Id != id &&
+                    rb.RoomId == booking.RoomId &&
+                    rb.Status != BookingStatus.Rejected &&
+                    request.StartTime < rb.EndTime &&
+                    request.EndTime > rb.StartTime
+                );
+
+            if (isConflict)
+                return BadRequest("Room is already booked at this time.");
+
+            booking.StartTime = request.StartTime;
+            booking.EndTime = request.EndTime;
+            booking.Status = BookingStatus.Pending;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Booking resubmitted successfully." });
         }
 
         // DELETE: api/room-bookings/{id}
