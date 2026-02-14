@@ -19,12 +19,22 @@ namespace backend.Controllers
             _context = context;
         }
 
-        // GET: /api/customers?search=
+        // GET: /api/customers?search=&page=1&pageSize=10
         [HttpGet]
-        public async Task<IActionResult> GetAll([FromQuery] string? search)
+        public async Task<IActionResult> GetAll(
+            [FromQuery] string? search,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10
+        )
         {
-            var query = _context.Customers.AsQueryable();
+            if (page < 1) page = 1;
+            if (pageSize < 1 || pageSize > 100) pageSize = 10;
 
+            var query = _context.Customers
+                .Where(c => !c.IsDeleted)
+                .AsQueryable();
+
+            // 🔍 Search by name or email
             if (!string.IsNullOrWhiteSpace(search))
             {
                 query = query.Where(c =>
@@ -32,8 +42,12 @@ namespace backend.Controllers
                     c.Email.Contains(search));
             }
 
+            var totalItems = await query.CountAsync();
+
             var customers = await query
                 .OrderByDescending(c => c.CreatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
                 .Select(c => new CustomerResponseDto
                 {
                     Id = c.Id,
@@ -46,7 +60,14 @@ namespace backend.Controllers
                 })
                 .ToListAsync();
 
-            return Ok(customers);
+            return Ok(new
+            {
+                page,
+                pageSize,
+                totalItems,
+                totalPages = (int)Math.Ceiling(totalItems / (double)pageSize),
+                data = customers
+            });
         }
 
         // GET: /api/customers/{id}
@@ -54,7 +75,7 @@ namespace backend.Controllers
         public async Task<IActionResult> GetById(int id)
         {
             var customer = await _context.Customers
-                .Where(c => c.Id == id)
+                .Where(c => c.Id == id && !c.IsDeleted)
                 .Select(c => new CustomerResponseDto
                 {
                     Id = c.Id,
@@ -82,7 +103,10 @@ namespace backend.Controllers
                 return BadRequest(ModelState);
 
             bool emailExists = await _context.Customers
-                .AnyAsync(c => c.Email == request.Email);
+            .AnyAsync(c =>
+                c.Email == request.Email &&
+                !c.IsDeleted
+            );
 
             if (emailExists)
                 return BadRequest("Email already exists.");
@@ -146,16 +170,30 @@ namespace backend.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var customer = await _context.Customers.FindAsync(id);
+            var customer = await _context.Customers
+                .FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted);
+
             if (customer == null)
                 return NotFound();
+
+            bool hasActiveBookings = await _context.RoomBookings
+                .AnyAsync(rb =>
+                    rb.CustomerId == id &&
+                    !rb.IsDeleted &&
+                    (rb.Status == BookingStatus.Pending ||
+                    rb.Status == BookingStatus.Approved)
+                );
+
+            if (hasActiveBookings)
+                return BadRequest("Customer still has active bookings.");
 
             customer.IsDeleted = true;
             customer.IsActive = false;
             customer.DeletedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
-            return NoContent();
+
+            return Ok(new { message = "Customer soft deleted." });
         }
     }
 }
