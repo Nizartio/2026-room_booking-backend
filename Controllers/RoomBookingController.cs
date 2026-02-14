@@ -25,13 +25,15 @@ namespace backend.Controllers
             [FromQuery] int pageSize = 10,
             [FromQuery] string? status = null,
             [FromQuery] int? roomId = null,
-            [FromQuery] int? customerId = null
+            [FromQuery] int? customerId = null,
+            [FromQuery] string? search = null
         )
         {
             if (page < 1) page = 1;
             if (pageSize < 1 || pageSize > 100) pageSize = 10;
 
             var query = _context.RoomBookings
+                .Where(rb => !rb.IsDeleted)
                 .Include(rb => rb.Room)
                 .Include(rb => rb.Customer)
                 .AsQueryable();
@@ -49,6 +51,16 @@ namespace backend.Controllers
 
             if (customerId.HasValue)
                 query = query.Where(rb => rb.CustomerId == customerId);
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var keyword = search.ToLower();
+                query = query.Where(rb => 
+                    rb.Room.Name.Contains(keyword) ||
+                    rb.Customer.Name.Contains(keyword) ||
+                    rb.Customer.Email.Contains(keyword)
+                );
+            }
 
             var totalItems = await query.CountAsync();
 
@@ -487,10 +499,9 @@ namespace backend.Controllers
 
             if (booking == null || booking.IsDeleted)
                 return NotFound();
-
-            // Protect approved booking
-            if (booking.Status == BookingStatus.Approved)
-                return BadRequest("Approved booking cannot be deleted.");
+            
+            if (booking.Status != BookingStatus.Rejected)
+                return BadRequest("Only rejected bookings can be deleted.");
 
             booking.IsDeleted = true;
             booking.DeletedAt = DateTime.UtcNow;
