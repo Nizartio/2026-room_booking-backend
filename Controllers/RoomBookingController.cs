@@ -438,10 +438,57 @@ namespace backend.Controllers
 
             await _context.SaveChangesAsync();
 
+            // Update BookingGroup status if booking belongs to a group
+            if (booking.BookingGroupId.HasValue)
+            {
+                await UpdateBookingGroupStatus(booking.BookingGroupId.Value);
+            }
+
             return Ok(new
             {
                 message = $"Booking {request.Status}"
             });
+        }
+
+        // Helper method to update BookingGroup status based on its bookings
+        private async Task UpdateBookingGroupStatus(int bookingGroupId)
+        {
+            var bookingGroup = await _context.BookingGroups
+                .Include(bg => bg.RoomBookings)
+                .FirstOrDefaultAsync(bg => bg.Id == bookingGroupId);
+
+            if (bookingGroup == null) return;
+
+            var bookings = bookingGroup.RoomBookings.Where(rb => !rb.IsDeleted).ToList();
+            if (bookings.Count == 0) return;
+
+            var approvedCount = bookings.Count(b => b.Status == BookingStatus.Approved);
+            var rejectedCount = bookings.Count(b => b.Status == BookingStatus.Rejected);
+            var pendingCount = bookings.Count(b => b.Status == BookingStatus.Pending);
+
+            if (approvedCount == bookings.Count)
+            {
+                bookingGroup.Status = BookingGroupStatus.AllApproved;
+            }
+            else if (rejectedCount == bookings.Count)
+            {
+                bookingGroup.Status = BookingGroupStatus.AllRejected;
+            }
+            else if (approvedCount > 0 && rejectedCount > 0)
+            {
+                bookingGroup.Status = BookingGroupStatus.PartiallyApproved;
+            }
+            else if (rejectedCount > 0)
+            {
+                bookingGroup.Status = BookingGroupStatus.PartiallyRejected;
+            }
+            else
+            {
+                bookingGroup.Status = BookingGroupStatus.Pending;
+            }
+
+            bookingGroup.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
         }
 
 
@@ -489,6 +536,12 @@ namespace backend.Controllers
 
             await _context.SaveChangesAsync();
 
+            // Update BookingGroup status if booking belongs to a group
+            if (booking.BookingGroupId.HasValue)
+            {
+                await UpdateBookingGroupStatus(booking.BookingGroupId.Value);
+            }
+
             return Ok(new { message = "Booking resubmitted successfully." });
         }
 
@@ -505,10 +558,18 @@ namespace backend.Controllers
             if (booking.Status != BookingStatus.Rejected)
                 return BadRequest(ApiErrorResponse.FromMessage("Only rejected bookings can be deleted."));
 
+            var bookingGroupId = booking.BookingGroupId;
+            
             booking.IsDeleted = true;
             booking.DeletedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
+
+            // Update BookingGroup status if booking belongs to a group
+            if (bookingGroupId.HasValue)
+            {
+                await UpdateBookingGroupStatus(bookingGroupId.Value);
+            }
 
             return Ok(new
             {
