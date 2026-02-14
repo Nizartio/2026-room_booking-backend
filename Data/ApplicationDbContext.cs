@@ -13,6 +13,7 @@ namespace backend.Data
         public DbSet<Room> Rooms => Set<Room>();
         public DbSet<RoomBooking> RoomBookings => Set<RoomBooking>();
         public DbSet<Customer> Customers => Set<Customer>();
+        public DbSet<BookingGroup> BookingGroups => Set<BookingGroup>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -25,6 +26,15 @@ namespace backend.Data
                 .HasQueryFilter(r => !r.IsDeleted);
             modelBuilder.Entity<RoomBooking>()
                 .HasQueryFilter(rb => !rb.IsDeleted);
+            modelBuilder.Entity<BookingGroup>()
+                .HasQueryFilter(bg => !bg.IsDeleted);
+
+            // Relationships
+            modelBuilder.Entity<RoomBooking>()
+                .HasOne(rb => rb.BookingGroup)
+                .WithMany(bg => bg.RoomBookings)
+                .HasForeignKey(rb => rb.BookingGroupId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             // Unique email for Customer
             modelBuilder.Entity<Customer>()
@@ -33,6 +43,9 @@ namespace backend.Data
             //For Enums
             modelBuilder.Entity<RoomBooking>()
                 .Property(rb => rb.Status)
+                .HasConversion<string>();
+            modelBuilder.Entity<BookingGroup>()
+                .Property(bg => bg.Status)
                 .HasConversion<string>();
 
         }

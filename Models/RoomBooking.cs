@@ -6,6 +6,11 @@ namespace backend.Models
     {
         public int Id { get; set; }
 
+        public int? BookingGroupId { get; set; }
+
+        // Navigation - parent booking group
+        public BookingGroup? BookingGroup { get; set; }
+
         [Required]
         public int RoomId { get; set; }
 
@@ -26,6 +31,8 @@ namespace backend.Models
 
         [Required]
         public BookingStatus Status { get; set; } = BookingStatus.Pending;
+
+        public string? Description { get; set; }
         
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

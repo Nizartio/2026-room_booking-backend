@@ -15,5 +15,7 @@ namespace backend.DTOs.Requests
 
         [Required]
         public DateTime EndTime { get; set; }
+
+        public string? Description { get; set; }
     }
 }

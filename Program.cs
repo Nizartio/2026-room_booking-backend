@@ -2,6 +2,9 @@ using backend.Data;
 using backend.Seeders;
 using Microsoft.EntityFrameworkCore;
 
+// Load environment variables from .env file
+DotNetEnv.Env.Load();
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Controllers
@@ -12,16 +15,23 @@ builder.Services.AddSwaggerGen();
 
 
 // DbContext (SQLite)
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlite("Data Source=room_booking.db"));
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
+    ?? Environment.GetEnvironmentVariable("DATABASE_CONNECTION_STRING") 
+    ?? "Data Source=room_booking.db";
 
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
+    options.UseSqlite(connectionString));
+
+var corsOrigins = builder.Configuration["CORS_ALLOWED_ORIGINS"]
+    ?? Environment.GetEnvironmentVariable("CORS_ALLOWED_ORIGINS")
+    ?? "http://localhost:5173";
 
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend",
         policy =>
         {
-            policy.WithOrigins("http://localhost:5173")
+            policy.WithOrigins(corsOrigins.Split(',', StringSplitOptions.RemoveEmptyEntries))
                   .AllowAnyHeader()
                   .AllowAnyMethod();
         });

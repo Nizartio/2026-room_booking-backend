@@ -56,7 +56,7 @@ namespace backend.Controllers
                 .FirstOrDefaultAsync();
 
             if (room == null)
-                return NotFound();
+                return NotFound(ApiErrorResponse.FromMessage("Room not found."));
 
             return Ok(room);
         }
@@ -79,13 +79,13 @@ namespace backend.Controllers
         public async Task<IActionResult> Create(CreateRoomRequestDto request)
         {
             if (!ModelState.IsValid)
-                return BadRequest(ModelState);
+                return BadRequest(ApiErrorResponse.FromModelState(ModelState));
 
             bool exists = await _context.Rooms
                 .AnyAsync(r => r.Name == request.Name);
 
             if (exists)
-                return BadRequest("Room name already exists.");
+                return BadRequest(ApiErrorResponse.FromMessage("Room name already exists."));
 
             var room = new Room
             {
@@ -117,17 +117,17 @@ namespace backend.Controllers
         public async Task<IActionResult> Update(int id, UpdateRoomRequestDto request)
         {
             if (!ModelState.IsValid)
-                return BadRequest(ModelState);
+                return BadRequest(ApiErrorResponse.FromModelState(ModelState));
 
             var room = await _context.Rooms.FindAsync(id);
             if (room == null)
-                return NotFound();
+                return NotFound(ApiErrorResponse.FromMessage("Room not found."));
 
             bool exists = await _context.Rooms
                 .AnyAsync(r => r.Name == request.Name && r.Id != id);
 
             if (exists)
-                return BadRequest("Room name already exists.");
+                return BadRequest(ApiErrorResponse.FromMessage("Room name already exists."));
 
             room.Name = request.Name;
             room.Capacity = request.Capacity;
@@ -145,7 +145,7 @@ namespace backend.Controllers
         {
             var room = await _context.Rooms.FindAsync(id);
             if (room == null)
-                return NotFound();
+                return NotFound(ApiErrorResponse.FromMessage("Room not found."));
 
             room.IsDeleted = true;
             room.IsActive = false;

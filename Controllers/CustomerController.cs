@@ -89,7 +89,7 @@ namespace backend.Controllers
                 .FirstOrDefaultAsync();
 
             if (customer == null)
-                return NotFound();
+                return NotFound(ApiErrorResponse.FromMessage("Customer not found."));
 
             return Ok(customer);
         }
@@ -100,7 +100,7 @@ namespace backend.Controllers
         public async Task<IActionResult> Create(CreateCustomerRequestDto request)
         {
             if (!ModelState.IsValid)
-                return BadRequest(ModelState);
+                return BadRequest(ApiErrorResponse.FromModelState(ModelState));
 
             bool emailExists = await _context.Customers
             .AnyAsync(c =>
@@ -109,7 +109,7 @@ namespace backend.Controllers
             );
 
             if (emailExists)
-                return BadRequest("Email already exists.");
+                return BadRequest(ApiErrorResponse.FromMessage("Email already exists."));
 
             var customer = new Customer
             {
@@ -144,17 +144,17 @@ namespace backend.Controllers
         public async Task<IActionResult> Update(int id, UpdateCustomerRequestDto request)
         {
             if (!ModelState.IsValid)
-                return BadRequest(ModelState);
+                return BadRequest(ApiErrorResponse.FromModelState(ModelState));
 
             var customer = await _context.Customers.FindAsync(id);
             if (customer == null)
-                return NotFound();
+                return NotFound(ApiErrorResponse.FromMessage("Customer not found."));
 
             bool emailExists = await _context.Customers
                 .AnyAsync(c => c.Email == request.Email && c.Id != id);
 
             if (emailExists)
-                return BadRequest("Email already exists.");
+                return BadRequest(ApiErrorResponse.FromMessage("Email already exists."));
 
             customer.Name = request.Name;
             customer.Email = request.Email;
@@ -174,7 +174,7 @@ namespace backend.Controllers
                 .FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted);
 
             if (customer == null)
-                return NotFound();
+                return NotFound(ApiErrorResponse.FromMessage("Customer not found."));
 
             bool hasActiveBookings = await _context.RoomBookings
                 .AnyAsync(rb =>
@@ -185,7 +185,7 @@ namespace backend.Controllers
                 );
 
             if (hasActiveBookings)
-                return BadRequest("Customer still has active bookings.");
+                return BadRequest(ApiErrorResponse.FromMessage("Customer still has active bookings."));
 
             customer.IsDeleted = true;
             customer.IsActive = false;

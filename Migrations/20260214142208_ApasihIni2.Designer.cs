@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using backend.Data;
 
@@ -10,59 +11,14 @@ using backend.Data;
 namespace backend.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260214142208_ApasihIni2")]
+    partial class ApasihIni2
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.0");
-
-            modelBuilder.Entity("backend.Models.BookingGroup", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("CustomerId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("EndDate")
-                        .HasColumnType("TEXT");
-
-                    b.Property<TimeSpan>("EndTime")
-                        .HasColumnType("TEXT");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("StartDate")
-                        .HasColumnType("TEXT");
-
-                    b.Property<TimeSpan>("StartTime")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CustomerId");
-
-                    b.ToTable("BookingGroups");
-                });
 
             modelBuilder.Entity("backend.Models.Customer", b =>
                 {
@@ -147,9 +103,6 @@ namespace backend.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<int?>("BookingGroupId")
-                        .HasColumnType("INTEGER");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
@@ -157,9 +110,6 @@ namespace backend.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Description")
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime>("EndTime")
@@ -180,8 +130,6 @@ namespace backend.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("BookingGroupId");
-
                     b.HasIndex("CustomerId");
 
                     b.HasIndex("RoomId");
@@ -189,24 +137,8 @@ namespace backend.Migrations
                     b.ToTable("RoomBookings");
                 });
 
-            modelBuilder.Entity("backend.Models.BookingGroup", b =>
-                {
-                    b.HasOne("backend.Models.Customer", "Customer")
-                        .WithMany()
-                        .HasForeignKey("CustomerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Customer");
-                });
-
             modelBuilder.Entity("backend.Models.RoomBooking", b =>
                 {
-                    b.HasOne("backend.Models.BookingGroup", "BookingGroup")
-                        .WithMany("RoomBookings")
-                        .HasForeignKey("BookingGroupId")
-                        .OnDelete(DeleteBehavior.Cascade);
-
                     b.HasOne("backend.Models.Customer", "Customer")
                         .WithMany("RoomBookings")
                         .HasForeignKey("CustomerId")
@@ -219,16 +151,9 @@ namespace backend.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("BookingGroup");
-
                     b.Navigation("Customer");
 
                     b.Navigation("Room");
-                });
-
-            modelBuilder.Entity("backend.Models.BookingGroup", b =>
-                {
-                    b.Navigation("RoomBookings");
                 });
 
             modelBuilder.Entity("backend.Models.Customer", b =>

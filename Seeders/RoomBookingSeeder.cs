@@ -7,40 +7,37 @@ namespace backend.Seeders
     {
         public static void Seed(ApplicationDbContext context)
         {
-            // Idempotent
             if (context.RoomBookings.Any())
                 return;
 
-            // Ambil master data (FK safety)
-            var labMultimedia = context.Rooms
-                .First(r => r.Name == "Lab Multimedia" && r.IsActive);
-
-            var ruangRapat = context.Rooms
-                .First(r => r.Name == "Ruang Rapat A" && r.IsActive);
-
-            var customer1 = context.Customers
-                .First(c => c.Email == "nizartiochandraadinata@gmail.com" && c.IsActive);
-
-            var customer2 = context.Customers
-                .First(c => c.Email == "bem@pens.ac.id" && c.IsActive);
+            var firstCustomer = context.Customers.First();
+            var firstRoom = context.Rooms.First();
 
             var bookings = new List<RoomBooking>
             {
-                new RoomBooking
+                new()
                 {
-                    RoomId = labMultimedia.Id,
-                    CustomerId = customer1.Id,
-                    StartTime = DateTime.Today.AddHours(8),
-                    EndTime = DateTime.Today.AddHours(10),
+                    RoomId = firstRoom.Id,
+                    CustomerId = firstCustomer.Id,
+                    StartTime = DateTime.UtcNow.AddDays(1),
+                    EndTime = DateTime.UtcNow.AddDays(1).AddHours(2),
                     Status = BookingStatus.Pending
                 },
-                new RoomBooking
+                new()
                 {
-                    RoomId = ruangRapat.Id,
-                    CustomerId = customer2.Id,
-                    StartTime = DateTime.Today.AddHours(13),
-                    EndTime = DateTime.Today.AddHours(15),
+                    RoomId = firstRoom.Id,
+                    CustomerId = firstCustomer.Id,
+                    StartTime = DateTime.UtcNow.AddDays(2),
+                    EndTime = DateTime.UtcNow.AddDays(2).AddHours(3),
                     Status = BookingStatus.Approved
+                },
+                new()
+                {
+                    RoomId = firstRoom.Id,
+                    CustomerId = firstCustomer.Id,
+                    StartTime = DateTime.UtcNow.AddDays(3),
+                    EndTime = DateTime.UtcNow.AddDays(3).AddHours(1),
+                    Status = BookingStatus.Rejected
                 }
             };
 

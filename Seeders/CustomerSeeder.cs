@@ -7,20 +7,21 @@ namespace backend.Seeders
     {
         public static void Seed(ApplicationDbContext context)
         {
-            if (context.Customers.Any()) return;
+            if (context.Customers.Any())
+                return;
 
             var customers = new List<Customer>
             {
-              new Customer { Name = "Nizartio (UKM E2C)", Email = "nizartio@e2c.ac.id", Phone="0812345671", Address="Jalan A", IsActive=true },
-              new Customer { Name = "Raka (BEM)", Email = "raka@bem.ac.id", Phone="0812345672", Address="Jalan B", IsActive=true },
-              new Customer { Name = "Dina (HIMA Informatika)", Email = "dina@himaif.ac.id", Phone="0812345673", Address="Jalan C", IsActive=true },
-              new Customer { Name = "Adit (UKM Robotika)", Email = "adit@robot.ac.id", Phone="0812345674", Address="Jalan D", IsActive=true },
-              new Customer { Name = "Salsa (UKM Musik)", Email = "salsa@musik.ac.id", Phone="0812345675", Address="Jalan E", IsActive=true },
-              new Customer { Name = "Fajar (UKM Basket)", Email = "fajar@basket.ac.id", Phone="0812345676", Address="Lapangan", IsActive=true },
-              new Customer { Name = "Tasya (UKM Tari)", Email = "tasya@tari.ac.id", Phone="0812345677", Address="Jalan Seni", IsActive=true },
-              new Customer { Name = "Kevin (HIMA Elektro)", Email = "kevin@elektro.ac.id", Phone="0812345678", Address="Lab Elektro", IsActive=true },
-              new Customer { Name = "Maya (HIMA Mesin)", Email = "maya@mesin.ac.id", Phone="0812345679", Address=" Jalan Workshop", IsActive=true },
-              new Customer { Name = "Rio (UKM English Club)", Email = "rio@english.ac.id", Phone="0812345680", Address="Jalan Bahasa", IsActive=true }
+                new() { Name = "Nizartio (UKM E2C)", Email = "nizartio@campus.ac.id", Phone = "081234567890", Address = "PENS Surabaya" },
+                new() { Name = "Raka (HIMA IF)", Email = "raka@campus.ac.id", Phone = "081111111111", Address = "Gedung D3" },
+                new() { Name = "Salsa (BEM)", Email = "salsa@campus.ac.id", Phone = "082222222222", Address = "Gedung Pusat" },
+                new() { Name = "Dimas (UKM Robotik)", Email = "dimas@campus.ac.id", Phone = "083333333333", Address = "Lab Robotik" },
+                new() { Name = "Alya (UKM Musik)", Email = "alya@campus.ac.id", Phone = "084444444444", Address = "Aula Kampus" },
+                new() { Name = "Fajar (HIMA Elektro)", Email = "fajar@campus.ac.id", Phone = "085555555555", Address = "Gedung Elektro" },
+                new() { Name = "Putri (UKM Tari)", Email = "putri@campus.ac.id", Phone = "086666666666", Address = "Gedung Seni" },
+                new() { Name = "Ardi (UKM Futsal)", Email = "ardi@campus.ac.id", Phone = "087777777777", Address = "Lapangan Indoor" },
+                new() { Name = "Lina (HIMA Kominfo)", Email = "lina@campus.ac.id", Phone = "088888888888", Address = "Gedung IT" },
+                new() { Name = "Bayu (UKM English)", Email = "bayu@campus.ac.id", Phone = "089999999999", Address = "Ruang Bahasa" }
             };
 
             context.Customers.AddRange(customers);
