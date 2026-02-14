@@ -25,7 +25,8 @@ namespace backend.Controllers
             [FromQuery] int pageSize = 10,
             [FromQuery] string? status = null,
             [FromQuery] int? roomId = null,
-            [FromQuery] int? customerId = null
+            [FromQuery] int? customerId = null,
+            [FromQuery] string? search = null
         )
         {
             if (page < 1) page = 1;
@@ -49,6 +50,14 @@ namespace backend.Controllers
 
             if (customerId.HasValue)
                 query = query.Where(rb => rb.CustomerId == customerId);
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+              var keyword = search.ToLower();
+                query = query.Where(rb => 
+                    rb.Room.Name.Contains(search) ||
+                    rb.Customer.Name.Contains(search));
+            }
 
             var totalItems = await query.CountAsync();
 
