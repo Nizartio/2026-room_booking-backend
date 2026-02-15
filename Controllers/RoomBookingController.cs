@@ -460,16 +460,7 @@ namespace backend.Controllers
             if (bookingGroup == null) return;
 
             var bookings = bookingGroup.RoomBookings.Where(rb => !rb.IsDeleted).ToList();
-            
-            // If all RoomBookings have been deleted, soft delete the BookingGroup
-            if (bookings.Count == 0)
-            {
-                bookingGroup.IsDeleted = true;
-                bookingGroup.DeletedAt = DateTime.UtcNow;
-                bookingGroup.UpdatedAt = DateTime.UtcNow;
-                await _context.SaveChangesAsync();
-                return;
-            }
+            if (bookings.Count == 0) return;
 
             var approvedCount = bookings.Count(b => b.Status == BookingStatus.Approved);
             var rejectedCount = bookings.Count(b => b.Status == BookingStatus.Rejected);
@@ -498,6 +489,21 @@ namespace backend.Controllers
 
             bookingGroup.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
+        }
+
+        private static List<DateTime> BuildDateRange(DateTime startDate, DateTime endDate)
+        {
+            var dates = new List<DateTime>();
+            var currentDate = startDate.Date;
+            var finalDate = endDate.Date;
+
+            while (currentDate <= finalDate)
+            {
+                dates.Add(currentDate);
+                currentDate = currentDate.AddDays(1);
+            }
+
+            return dates;
         }
 
 
@@ -598,23 +604,9 @@ namespace backend.Controllers
 
             foreach (var groupItem in request.Groups)
             {
-                var selectedDates = groupItem.Dates
-                    .Where(date => date != default)
-                    .Select(date => date.Date)
-                    .Distinct()
-                    .OrderBy(date => date)
-                    .ToList();
-
-                if (selectedDates.Count == 0)
-                {
-                    var currentDate = groupItem.StartDate.Date;
-                    var lastDate = groupItem.EndDate.Date;
-                    while (currentDate <= lastDate)
-                    {
-                        selectedDates.Add(currentDate);
-                        currentDate = currentDate.AddDays(1);
-                    }
-                }
+                var selectedDates = groupItem.Dates != null && groupItem.Dates.Count > 0
+                    ? groupItem.Dates.Select(d => d.Date).Distinct().OrderBy(d => d).ToList()
+                    : BuildDateRange(groupItem.StartDate.Date, groupItem.EndDate.Date);
 
                 if (selectedDates.Count == 0)
                 {
@@ -623,7 +615,7 @@ namespace backend.Controllers
                         success = false,
                         conflicts = new[]
                         {
-                            new { message = "No dates selected." }
+                            new { message = "No dates provided for booking group" }
                         }
                     });
                     continue;
@@ -648,7 +640,7 @@ namespace backend.Controllers
                         continue;
                     }
 
-                    // Check selected dates for conflicts
+                    // Check conflicts for selected dates
                     foreach (var selectedDate in selectedDates)
                     {
                         var slotStart = selectedDate.Date.Add(groupItem.StartTime);
@@ -690,25 +682,29 @@ namespace backend.Controllers
                 }
 
                 // Create the booking group
-                var groupStartDate = selectedDates.First();
-                var groupEndDate = selectedDates.Last();
                 var bookingGroup = new BookingGroup
                 {
                     CustomerId = request.CustomerId,
-                    StartDate = groupStartDate,
-                    EndDate = groupEndDate,
+                    StartDate = selectedDates.First(),
+                    EndDate = selectedDates.Last(),
                     StartTime = groupItem.StartTime,
                     EndTime = groupItem.EndTime,
                     Description = groupItem.Description,
                     Status = BookingGroupStatus.Pending,
-                    CreatedAt = DateTime.UtcNow,
-                    BookingGroupDates = selectedDates
-                        .Select(date => new BookingGroupDate { Date = date })
-                        .ToList()
+                    CreatedAt = DateTime.UtcNow
                 };
 
                 _context.BookingGroups.Add(bookingGroup);
                 await _context.SaveChangesAsync();
+
+                foreach (var selectedDate in selectedDates)
+                {
+                    _context.BookingGroupDates.Add(new BookingGroupDate
+                    {
+                        BookingGroupId = bookingGroup.Id,
+                        Date = selectedDate.Date
+                    });
+                }
 
                 // Create individual room bookings
                 foreach (var selectedDate in selectedDates)
@@ -822,25 +818,12 @@ namespace backend.Controllers
                 .Include(bg => bg.BookingGroupDates)
                 .AsQueryable();
 
-            // Filter by status (supports multiple comma-separated values)
+            // Filter by status
             if (!string.IsNullOrWhiteSpace(status))
             {
-                var statusValues = status.Split(',', StringSplitOptions.RemoveEmptyEntries)
-                    .Select(s => s.Trim())
-                    .ToList();
-                
-                var statusEnums = new List<BookingGroupStatus>();
-                foreach (var statusValue in statusValues)
+                if (Enum.TryParse<BookingGroupStatus>(status, true, out var statusEnum))
                 {
-                    if (Enum.TryParse<BookingGroupStatus>(statusValue, true, out var statusEnum))
-                    {
-                        statusEnums.Add(statusEnum);
-                    }
-                }
-
-                if (statusEnums.Any())
-                {
-                    query = query.Where(bg => statusEnums.Contains(bg.Status));
+                    query = query.Where(bg => bg.Status == statusEnum);
                 }
             }
 
