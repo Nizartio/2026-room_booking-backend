@@ -460,7 +460,16 @@ namespace backend.Controllers
             if (bookingGroup == null) return;
 
             var bookings = bookingGroup.RoomBookings.Where(rb => !rb.IsDeleted).ToList();
-            if (bookings.Count == 0) return;
+            
+            // If all RoomBookings have been deleted, soft delete the BookingGroup
+            if (bookings.Count == 0)
+            {
+                bookingGroup.IsDeleted = true;
+                bookingGroup.DeletedAt = DateTime.UtcNow;
+                bookingGroup.UpdatedAt = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+                return;
+            }
 
             var approvedCount = bookings.Count(b => b.Status == BookingStatus.Approved);
             var rejectedCount = bookings.Count(b => b.Status == BookingStatus.Rejected);
@@ -589,6 +598,37 @@ namespace backend.Controllers
 
             foreach (var groupItem in request.Groups)
             {
+                var selectedDates = groupItem.Dates
+                    .Where(date => date != default)
+                    .Select(date => date.Date)
+                    .Distinct()
+                    .OrderBy(date => date)
+                    .ToList();
+
+                if (selectedDates.Count == 0)
+                {
+                    var currentDate = groupItem.StartDate.Date;
+                    var lastDate = groupItem.EndDate.Date;
+                    while (currentDate <= lastDate)
+                    {
+                        selectedDates.Add(currentDate);
+                        currentDate = currentDate.AddDays(1);
+                    }
+                }
+
+                if (selectedDates.Count == 0)
+                {
+                    results.Add(new
+                    {
+                        success = false,
+                        conflicts = new[]
+                        {
+                            new { message = "No dates selected." }
+                        }
+                    });
+                    continue;
+                }
+
                 // Check for conflicts across all rooms in this group
                 var conflicts = new List<object>();
                 var canCreateGroup = true;
@@ -608,12 +648,11 @@ namespace backend.Controllers
                         continue;
                     }
 
-                    // Generate all dates in range and check for conflicts
-                    var currentDate = groupItem.StartDate;
-                    while (currentDate <= groupItem.EndDate)
+                    // Check selected dates for conflicts
+                    foreach (var selectedDate in selectedDates)
                     {
-                        var slotStart = currentDate.Date.Add(groupItem.StartTime);
-                        var slotEnd = currentDate.Date.Add(groupItem.EndTime);
+                        var slotStart = selectedDate.Date.Add(groupItem.StartTime);
+                        var slotEnd = selectedDate.Date.Add(groupItem.EndTime);
 
                         // Check if there's any booking conflict
                         var hasConflict = await _context.RoomBookings
@@ -629,7 +668,7 @@ namespace backend.Controllers
                             conflicts.Add(new
                             {
                                 roomId,
-                                date = new DateOnly(currentDate.Year, currentDate.Month, currentDate.Day),
+                                date = new DateOnly(selectedDate.Year, selectedDate.Month, selectedDate.Day),
                                 startTime = groupItem.StartTime,
                                 endTime = groupItem.EndTime,
                                 message = $"Room {room.Name} already booked at this time"
@@ -637,8 +676,6 @@ namespace backend.Controllers
                             canCreateGroup = false;
                             break;
                         }
-
-                        currentDate = currentDate.AddDays(1);
                     }
                 }
 
@@ -653,29 +690,33 @@ namespace backend.Controllers
                 }
 
                 // Create the booking group
+                var groupStartDate = selectedDates.First();
+                var groupEndDate = selectedDates.Last();
                 var bookingGroup = new BookingGroup
                 {
                     CustomerId = request.CustomerId,
-                    StartDate = groupItem.StartDate,
-                    EndDate = groupItem.EndDate,
+                    StartDate = groupStartDate,
+                    EndDate = groupEndDate,
                     StartTime = groupItem.StartTime,
                     EndTime = groupItem.EndTime,
                     Description = groupItem.Description,
                     Status = BookingGroupStatus.Pending,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.UtcNow,
+                    BookingGroupDates = selectedDates
+                        .Select(date => new BookingGroupDate { Date = date })
+                        .ToList()
                 };
 
                 _context.BookingGroups.Add(bookingGroup);
                 await _context.SaveChangesAsync();
 
                 // Create individual room bookings
-                var currentDateForBooking = groupItem.StartDate;
-                while (currentDateForBooking <= groupItem.EndDate)
+                foreach (var selectedDate in selectedDates)
                 {
                     foreach (var roomId in groupItem.RoomIds)
                     {
-                        var slotStart = currentDateForBooking.Date.Add(groupItem.StartTime);
-                        var slotEnd = currentDateForBooking.Date.Add(groupItem.EndTime);
+                        var slotStart = selectedDate.Date.Add(groupItem.StartTime);
+                        var slotEnd = selectedDate.Date.Add(groupItem.EndTime);
 
                         var roomBooking = new RoomBooking
                         {
@@ -690,8 +731,6 @@ namespace backend.Controllers
 
                         _context.RoomBookings.Add(roomBooking);
                     }
-
-                    currentDateForBooking = currentDateForBooking.AddDays(1);
                 }
 
                 await _context.SaveChangesAsync();
@@ -720,6 +759,7 @@ namespace backend.Controllers
                 .Include(bg => bg.Customer)
                 .Include(bg => bg.RoomBookings)
                     .ThenInclude(rb => rb.Room)
+                .Include(bg => bg.BookingGroupDates)
                 .OrderByDescending(bg => bg.CreatedAt)
                 .ToListAsync();
 
@@ -733,11 +773,15 @@ namespace backend.Controllers
                 EndDate = bg.EndDate,
                 StartTime = bg.StartTime,
                 EndTime = bg.EndTime,
+                Dates = bg.BookingGroupDates
+                    .Select(date => date.Date)
+                    .OrderBy(date => date)
+                    .ToList(),
                 Description = bg.Description,
                 Status = bg.Status.ToString(),
                 CreatedAt = bg.CreatedAt,
                 UpdatedAt = bg.UpdatedAt,
-                TotalRooms = bg.RoomBookings.Count,
+                TotalRooms = bg.RoomBookings.Select(rb => rb.RoomId).Distinct().Count(),
                 ApprovedCount = bg.RoomBookings.Count(rb => rb.Status == BookingStatus.Approved),
                 PendingCount = bg.RoomBookings.Count(rb => rb.Status == BookingStatus.Pending),
                 RejectedCount = bg.RoomBookings.Count(rb => rb.Status == BookingStatus.Rejected),
@@ -775,14 +819,28 @@ namespace backend.Controllers
                 .Include(bg => bg.Customer)
                 .Include(bg => bg.RoomBookings)
                     .ThenInclude(rb => rb.Room)
+                .Include(bg => bg.BookingGroupDates)
                 .AsQueryable();
 
-            // Filter by status
+            // Filter by status (supports multiple comma-separated values)
             if (!string.IsNullOrWhiteSpace(status))
             {
-                if (Enum.TryParse<BookingGroupStatus>(status, true, out var statusEnum))
+                var statusValues = status.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(s => s.Trim())
+                    .ToList();
+                
+                var statusEnums = new List<BookingGroupStatus>();
+                foreach (var statusValue in statusValues)
                 {
-                    query = query.Where(bg => bg.Status == statusEnum);
+                    if (Enum.TryParse<BookingGroupStatus>(statusValue, true, out var statusEnum))
+                    {
+                        statusEnums.Add(statusEnum);
+                    }
+                }
+
+                if (statusEnums.Any())
+                {
+                    query = query.Where(bg => statusEnums.Contains(bg.Status));
                 }
             }
 
@@ -814,11 +872,15 @@ namespace backend.Controllers
                 EndDate = bg.EndDate,
                 StartTime = bg.StartTime,
                 EndTime = bg.EndTime,
+                Dates = bg.BookingGroupDates
+                    .Select(date => date.Date)
+                    .OrderBy(date => date)
+                    .ToList(),
                 Description = bg.Description,
                 Status = bg.Status.ToString(),
                 CreatedAt = bg.CreatedAt,
                 UpdatedAt = bg.UpdatedAt,
-                TotalRooms = bg.RoomBookings.Count,
+                TotalRooms = bg.RoomBookings.Select(rb => rb.RoomId).Distinct().Count(),
                 ApprovedCount = bg.RoomBookings.Count(rb => rb.Status == BookingStatus.Approved),
                 PendingCount = bg.RoomBookings.Count(rb => rb.Status == BookingStatus.Pending),
                 RejectedCount = bg.RoomBookings.Count(rb => rb.Status == BookingStatus.Rejected),

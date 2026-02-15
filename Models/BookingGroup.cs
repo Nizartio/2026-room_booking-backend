@@ -35,6 +35,9 @@ namespace backend.Models
         // Navigation - rooms in this group
         public ICollection<RoomBooking> RoomBookings { get; set; } = new List<RoomBooking>();
 
+        // Navigation - selected dates for this group
+        public ICollection<BookingGroupDate> BookingGroupDates { get; set; } = new List<BookingGroupDate>();
+
         // 🔽 Soft delete
         public bool IsDeleted { get; set; } = false;
         public DateTime? DeletedAt { get; set; }

@@ -13,6 +13,8 @@ namespace backend.DTOs.Requests
 
     public class CreateBookingGroupItemDto
     {
+        public List<DateTime> Dates { get; set; } = new();
+
         [Required]
         public DateTime StartDate { get; set; }
 

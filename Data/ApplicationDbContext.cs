@@ -14,6 +14,7 @@ namespace backend.Data
         public DbSet<RoomBooking> RoomBookings => Set<RoomBooking>();
         public DbSet<Customer> Customers => Set<Customer>();
         public DbSet<BookingGroup> BookingGroups => Set<BookingGroup>();
+        public DbSet<BookingGroupDate> BookingGroupDates => Set<BookingGroupDate>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -34,6 +35,12 @@ namespace backend.Data
                 .HasOne(rb => rb.BookingGroup)
                 .WithMany(bg => bg.RoomBookings)
                 .HasForeignKey(rb => rb.BookingGroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<BookingGroupDate>()
+                .HasOne(bgd => bgd.BookingGroup)
+                .WithMany(bg => bg.BookingGroupDates)
+                .HasForeignKey(bgd => bgd.BookingGroupId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             // Unique email for Customer

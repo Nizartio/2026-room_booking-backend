@@ -13,6 +13,8 @@ namespace backend.DTOs.Responses
         public TimeSpan StartTime { get; set; }
         public TimeSpan EndTime { get; set; }
 
+        public List<DateTime> Dates { get; set; } = new();
+
         public string? Description { get; set; }
 
         public string Status { get; set; } = string.Empty;
